@@ -18,7 +18,8 @@ import logging
 
 from microscope import ROI as microscopeROI
 
-class microscope(ICamera):
+
+class Microscope(ICamera):
 
   temp_dic={}
   dic = {}  
@@ -46,7 +47,7 @@ class microscope(ICamera):
         cam_roi: microscope.ROI = self.__camera.get_roi()
         cam_binning: microscope.Binning = self.__camera.get_binning()
 
-
+        buffer = queue.Queue()
         sensorShape = ROI(offset_x=0, offset_y=0, height=cam_roi.height //cam_binning.v, width=cam_roi.width // cam_binning.h)
         
         parameters = {}
@@ -91,18 +92,18 @@ class microscope(ICamera):
      
 
   def grabFrame(self) -> np.ndarray:
-     buffer = queue.Queue()
-     self.__camera.set_client(buffer)
+     self.__camera.set_client(self.buffer)
      self.__camera.enable()
      self.__camera._acquiring = True
      self.__camera._triggered = 1
      self.__camera._fetch_data()   # acquire image
-     img = buffer.get()            # retrieve image  
+     img = self.buffer.get()            # retrieve image  
      return img  
 
 
   def changeParameter(self, name: str, value: Any) -> None:
        if  self.module == "simulators":      #checkes which camera is choosen in the ui
+                    
           if name == "Exposure time":
                self.__camera.set_exposure_time(float(value))
           
