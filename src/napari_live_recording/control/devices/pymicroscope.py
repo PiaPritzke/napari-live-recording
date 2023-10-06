@@ -47,7 +47,7 @@ class Microscope(ICamera):
         cam_roi: microscope.ROI = self.__camera.get_roi()
         cam_binning: microscope.Binning = self.__camera.get_binning()
 
-        buffer = queue.Queue()
+        self.buffer = queue.Queue()
         sensorShape = ROI(offset_x=0, offset_y=0, height=cam_roi.height //cam_binning.v, width=cam_roi.width // cam_binning.h)
         
         parameters = {}
