@@ -12,6 +12,7 @@ import queue
 import importlib
 
 
+
 class Microscope(ICamera):
 
      index_dict = {}
@@ -82,6 +83,7 @@ class Microscope(ICamera):
 
           self.__buffer = queue.Queue()
           self.__camera.set_client(self.__buffer)
+
           
           super().__init__(name, deviceID, parameters, sensorShape)
  
@@ -102,6 +104,7 @@ class Microscope(ICamera):
 
 
      def changeParameter(self, name: str, value: Any) -> None:
+
           if name == "Exposure time":
                self.__camera.set_exposure_time(float(value))
           elif name == "transform":          # parameter type = 'enum'
