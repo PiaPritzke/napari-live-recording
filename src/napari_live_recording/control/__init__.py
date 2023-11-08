@@ -41,6 +41,8 @@ class LocalController(NamedTuple):
 
 class MainController(QObject):
     recordFinished = Signal()
+    newTimePoint = Signal(int)
+    newMaxTimePoint = Signal(int)
 
     def __init__(self) -> None:
         """Main Controller class. Stores all camera objects to access live and stack recordings."""
@@ -88,25 +90,30 @@ class MainController(QObject):
     def deleteCamera(self, cameraKey: str) -> None:
 
         """Deletes a camera device. """
-        with self.livePaused():
-            try:
-                self.deviceControllers[cameraKey].device.close()
-                self.deviceControllers[cameraKey].thread.quit()
-                self.deviceControllers[cameraKey].device.deleteLater()
-                self.deviceControllers[cameraKey].thread.deleteLater()
-                self.recordSignalCounter.maxCount -= 1
-            except RuntimeError:
-                # camera already deleted
-                pass
+        if self.isLive:
+            self.live(False)
+        try:
+            self.deviceControllers[cameraKey].device.close()
+            self.deviceControllers[cameraKey].thread.quit()
+            self.deviceControllers[cameraKey].thread.deleteLater()
+            self.deviceControllers[cameraKey].device.deleteLater()
+            self.recordSignalCounter.maxCount -= 1
+        except RuntimeError:
+            # camera already deleted
+            pass
+        
     def snap(self, cameraKey: str) -> np.ndarray:
-        return self.deviceControllers[cameraKey].device.grabFrame()
+        self.deviceControllers[cameraKey].device.setAcquisitionStatus(True)
+        image = self.deviceControllers[cameraKey].device.grabFrame()
+        self.deviceControllers[cameraKey].device.setAcquisitionStatus(False)
+        return image
 
     def live(self, toggle: bool) -> None:
         self.__isLive = toggle
 
         @thread_worker(worker_class=FunctionWorker, start_thread=False)
         def liveLoop():
-            while True:
+            while self.isLive:
                 for key in self.deviceControllers.keys():
                     self.deviceLiveBuffer[key] = np.copy(
                         self.deviceControllers[key].device.grabFrame()
@@ -206,9 +213,3 @@ class MainController(QObject):
     def stopRecord(self):
         self.recordLoopEnabled = False
         self.recordSignalCounter.count = 0
-    
-    def cleanup(self):
-        if self.isLive:
-            self.live(False)
-        for key in self.deviceControllers.keys():
-            self.deleteCamera(key)

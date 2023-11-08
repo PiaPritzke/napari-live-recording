@@ -13,26 +13,24 @@ from qtpy.QtWidgets import (
     QPushButton,
     QFileDialog,
     QStackedWidget,
+    QProgressBar
 )
 from superqt import QLabeledSlider, QLabeledDoubleSlider, QEnumComboBox
 from qtpy.QtWidgets import QFormLayout, QGridLayout, QGroupBox
 from abc import ABC, abstractmethod
 from dataclasses import replace
-from napari_live_recording.common import ROI, FileFormat, RecordType, MMC_DEVICE_MAP, microscopeDeviceDict
-from enum import Enum
+from napari_live_recording.common import ( 
+    ROI, 
+    FileFormat, 
+    RecordType, 
+    MMC_DEVICE_MAP, 
+    microscopeDeviceDict, 
+    baseRecordingFolder
+)
 from typing import Dict, List, Tuple
-
 
 class Timer(QTimer):
     pass
-
-
-class WidgetEnum(Enum):
-    ComboBox = (0,)
-    SpinBox = (1,)
-    DoubleSpinBox = (2,)
-    LabeledSlider = (3,)
-    LineEdit = 4
 
 
 class LocalWidget(ABC):
@@ -324,11 +322,11 @@ class CameraSelection(QObject):
         label = self.nameLineEdit.value
         module = ""
         device = ""
-        if interface in ["MicroManager", "PythonMicroscope"]:
+        if interface in ["MicroManager", "Microscope"]:
             if interface == "MicroManager":
                 module = self.adapterComboBox.value[0]
                 device = self.deviceComboBox.value[0]
-            elif interface == "PythonMicroscope":
+            elif interface == "Microscope":
                 module = self.microscopeModuleComboBox.value[0]
                 device = self.microscopeDeviceComboBox.value[0]
             else:
@@ -345,15 +343,6 @@ class CameraSelection(QObject):
                 self.idLineEdit.value
             )
         self.camerasComboBox.signals["currentIndexChanged"].connect(self._setAddEnabled)
-        self.addButton.clicked.connect(
-            lambda: self.newCameraRequested.emit(
-                self.camerasComboBox.value[0],
-                self.nameLineEdit.value,
-                (self.adapterComboBox.value[0] + " " + self.deviceComboBox.value[0])
-                if self.camerasComboBox.value[0] == "MicroManager"
-                else self.idLineEdit.value,
-            )
-        )
 
     def setAvailableCameras(self, cameras: List[str]) -> None:
         """Sets the ComboBox with the List of available camera devices.
@@ -381,7 +370,7 @@ class CameraSelection(QObject):
                     self.deviceComboBox.label, self.deviceComboBox.widget
                 )
 
-            elif camera == "PythonMicroscope":
+            elif camera == "Microscope":
                 self.stackLayouts[camera].addRow(
                     self.microscopeModuleComboBox.label, self.microscopeModuleComboBox.widget
                 )
@@ -422,14 +411,10 @@ class CameraSelection(QObject):
         This is done to avoid the first index, the "Select device" string, to be considered
         as a valid camera device (which is not).
         """
-        if idx > 0:
-            self.addButton.setEnabled(True)
-        else:
-            self.addButton.setEnabled(False)
+        self.addButton.setEnabled(idx > 0)
 
 
 class RecordHandling(QObject):
-    recordRequested = Signal(int)
 
     def __init__(self) -> None:
         """Recording Handling widget. Includes QPushButtons which allow to handle the following operations:
@@ -458,7 +443,7 @@ class RecordHandling(QObject):
         self.formatLabel.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         self.folderTextEdit = QLineEdit(
-            os.path.join(os.path.expanduser("~"), "Documents")
+            baseRecordingFolder
         )
         self.folderTextEdit.setReadOnly(True)
         self.folderButton = QPushButton("Select record folder")
@@ -484,7 +469,9 @@ class RecordHandling(QObject):
         self.recordSpinBox = QSpinBox()
         self.recordSpinBox.lineEdit().setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        # todo: this is currently hardcoded
+        self.recordProgress = QProgressBar()
+
+        # TODO: this is currently hardcoded
         # maybe should find a way to initialize
         # from outside the instance?
         self.recordSpinBox.setRange(1, 5000)
@@ -502,8 +489,12 @@ class RecordHandling(QObject):
         self.layout.addWidget(self.snap, 4, 0, 1, 3)
         self.layout.addWidget(self.live, 5, 0, 1, 3)
         self.layout.addWidget(self.record, 6, 0, 1, 3)
+        self.layout.addWidget(self.recordProgress, 7, 0, 1, 3)
         self.group.setLayout(self.layout)
         self.group.setFlat(True)
+
+        # progress bar is hidden until recording is started
+        self.recordProgress.hide()
 
         self.live.toggled.connect(self.handleLiveToggled)
         self.record.toggled.connect(self.handleRecordToggled)
@@ -562,6 +553,10 @@ class RecordHandling(QObject):
         self.snap.setEnabled(not status)
         self.live.setEnabled(not status)
         self.recordSpinBox.setEnabled(not status)
+        if status:
+            self.recordProgress.show()
+        else:
+            self.recordProgress.hide()
 
     @property
     def recordSize(self) -> int:

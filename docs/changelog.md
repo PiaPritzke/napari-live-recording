@@ -1,8 +1,13 @@
 # Changelog
 
+## 0.3.3
+
+- Added python-microscope interface (@PiaPritzke)
+- Added unit tests
+
 ## 0.3.2
 
-Removed reference of tifffile enumerator `PHOTOMETRIC` (see #22)
+- HOTFIX: Removed reference of tifffile enumerator `PHOTOMETRIC` (see #22)
 
 ## 0.3.1
 
